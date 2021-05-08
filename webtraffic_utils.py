@@ -65,7 +65,7 @@ def smape_np(A, F):
 
 
 def create_tb_cb(model_name):
-    return tf.keras.callbacks.TensorBoard(log_dir="./logs/"+model_name+"-"+datetime.now().strftime("%H-%M-%S"),
+    return tf.keras.callbacks.TensorBoard(log_dir="./logs/"+datetime.now().strftime("%m-%d-%H-%M-%S")+"-"+model_name,
                                           histogram_freq=10)
 
 
@@ -104,13 +104,20 @@ def ds_from_dataframe(df):
 
 
 
-def get_model_inputs(df_augmented):
+def get_model_inputs(df_augmented, return_seq=False):
     feat_cols = [ii for ii in df_augmented if "feat_" in ii]
     df_train = df_augmented.drop(columns=feat_cols)
+    nl, nc = df_train.shape
     inputs = [tf.convert_to_tensor(df_train.index), df_train.values[:,:-62]]
     for ii in feat_cols:
         inputs.append(tf.convert_to_tensor(df_augmented[ii].values))
-    return inputs, df_train.values[:,-62:]
+    output = df_train.values[:,-62:]
+    if return_seq:
+        output = np.empty((nl, MaxTs, 62))
+        for ii in range(MaxTs):
+            last = nc-MaxTs+ii+1
+            output[:,ii,:] = df_train.iloc[:,last-62:last]
+    return inputs, output
 
 
 def plot_check_result(df_train, page, models):
