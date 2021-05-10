@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.keras import layers
 import matplotlib.pyplot as plt
-
+from tensorflow import keras
 
 
 
@@ -67,7 +67,7 @@ def get_rnn_model(_Seq2seq, Nneurons=20, Nlayers=1, MaxTs=50, usePastYear=False,
     access1h = OneHotEncodingLayer(voc_access, name="ohAccess")(I_page)
 
     x, factors = normalize_rnn()(I_traffic)
-    x = preprocessing_rnn()(x, access1h)
+    x = preprocessing_rnn(MaxTs, useMetadata, usePastYear)(x, access1h)
     for ii in range(Nlayers-1):
         x = tf.keras.layers.GRU(Nneurons, return_sequences=True)(x)
     x = tf.keras.layers.GRU(Nneurons, return_sequences=_Seq2seq, name="gru0")(x)
