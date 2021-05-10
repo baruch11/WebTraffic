@@ -104,7 +104,7 @@ def ds_from_dataframe(df):
 
 
 
-def get_model_inputs(df_augmented, return_seq=False):
+def get_model_inputs(df_augmented, return_seq=0):
     feat_cols = [ii for ii in df_augmented if "feat_" in ii]
     df_train = df_augmented.drop(columns=feat_cols)
     nl, nc = df_train.shape
@@ -112,10 +112,10 @@ def get_model_inputs(df_augmented, return_seq=False):
     for ii in feat_cols:
         inputs.append(tf.convert_to_tensor(df_augmented[ii].values))
     output = df_train.values[:,-62:]
-    if return_seq:
-        output = np.empty((nl, MaxTs, 62))
-        for ii in range(MaxTs):
-            last = nc-MaxTs+ii+1
+    if return_seq>0:
+        output = np.empty((nl, return_seq, 62))
+        for ii in range(return_seq):
+            last = nc-return_seq+ii+1
             output[:,ii,:] = df_train.iloc[:,last-62:last]
     return inputs, output
 
