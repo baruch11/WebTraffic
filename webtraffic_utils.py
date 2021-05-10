@@ -5,6 +5,9 @@ from tensorflow.keras import layers
 import matplotlib.pyplot as plt
 
 
+
+
+# rnn
 class OneHotEncodingLayer(tf.keras.layers.experimental.preprocessing.PreprocessingLayer):
 
     def __init__(self, vocabulary=None, depth=None, **kwargs):
@@ -22,6 +25,67 @@ class OneHotEncodingLayer(tf.keras.layers.experimental.preprocessing.Preprocessi
 
     def get_config(self):
         return {'vocabulary': list(self.vocabulary), 'depth': int(self.depth)}
+
+
+
+class normalize_rnn(tf.keras.layers.Layer):
+    """ divide each row independently by its max"""
+    def call(self, inputs):
+        fact = tf.reduce_max(inputs, axis=1, keepdims=True)
+        ret = tf.divide(inputs, fact + 1e-10)
+        return ret, fact
+
+
+class preprocessing_rnn(tf.keras.layers.Layer):
+    def __init__(self, MaxTs=100, useMetadata=False, usePastYear= False, **kwargs):
+        super().__init__(**kwargs)
+        self.MaxTs = MaxTs
+        self.useMetadata = useMetadata
+        self.usePastYear = usePastYear
+
+    def call(self, inputs, access1h):
+        ret = inputs[:,-self.MaxTs:, np.newaxis]
+        output_len = 62
+        if self.useMetadata:
+            access_broadcast = tf.tile(access1h[:,np.newaxis,:],[1, self.MaxTs, 1])
+            ret = tf.concat([ret, access_broadcast], axis=2)
+
+        if self.usePastYear:
+            pastYear = inputs[:, -self.MaxTs-365+output_len:-365+output_len, np.newaxis]
+            ret = tf.concat([ret, pastYear], axis=2)
+        return ret
+
+
+def get_rnn_model(_Seq2seq, Nneurons=20, Nlayers=1, MaxTs=50, usePastYear=False, useMetadata=False):
+
+    output_len = 62
+    I_page = tf.keras.layers.Input(shape=(), dtype=object)
+    I_traffic = tf.keras.layers.Input(shape=(None,))
+
+    voc_access = ['all-access_all-agents', 'all-access_spider', 'desktop_all-agents',
+                  'mobile-web_all-agents']
+    access1h = OneHotEncodingLayer(voc_access, name="ohAccess")(I_page)
+
+    x, factors = normalize_rnn()(I_traffic)
+    x = preprocessing_rnn()(x, access1h)
+    for ii in range(Nlayers-1):
+        x = tf.keras.layers.GRU(Nneurons, return_sequences=True)(x)
+    x = tf.keras.layers.GRU(Nneurons, return_sequences=_Seq2seq, name="gru0")(x)
+
+    if not _Seq2seq:
+        x= tf.keras.layers.Dense(output_len, name="dense0")(x)
+    else:
+        x = keras.layers.TimeDistributed(keras.layers.Dense(output_len), name="td")(x)
+        factors = tf.cast(tf.tile(tf.expand_dims(factors, axis=1), (1, MaxTs, output_len)), tf.float32)
+
+    outputs= tf.multiply(x, factors)
+
+    model_rnn = tf.keras.Model(inputs=[I_page, I_traffic], outputs=[outputs])
+
+    model_rnn.compile(loss=SmapeLoss(), optimizer=tf.optimizers.Adam(learning_rate=1e-3), metrics=[SmapeMetric()])
+    return model_rnn
+
+
 
 
 def smape(A, F):
