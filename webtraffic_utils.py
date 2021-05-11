@@ -9,7 +9,7 @@ from tensorflow import keras
 
 # rnn
 class OneHotEncodingLayer(tf.keras.layers.experimental.preprocessing.PreprocessingLayer):
-
+    """ one hot encoding layer """
     def __init__(self, vocabulary=None, depth=None, **kwargs):
         super().__init__(**kwargs)
         self.vocabulary = vocabulary
@@ -37,37 +37,41 @@ class normalize_rnn(tf.keras.layers.Layer):
 
 
 class preprocessing_rnn(tf.keras.layers.Layer):
-    def __init__(self, MaxTs=100, useMetadata=False, usePastYear= False, **kwargs):
+    """ layer in charge of the inputs of the rnn """
+    def __init__(self, max_delay=100, use_metadata=False, use_past_year= False, **kwargs):
         super().__init__(**kwargs)
-        self.MaxTs = MaxTs
-        self.useMetadata = useMetadata
-        self.usePastYear = usePastYear
+        self.max_delay = max_delay
+        self.use_metadata = use_metadata
+        self.use_past_year = use_past_year
 
     def call(self, inputs, access1h):
-        ret = inputs[:,-self.MaxTs:, np.newaxis]
+        ret = inputs[:,-self.max_delay:, np.newaxis]
         output_len = 62
-        if self.useMetadata:
-            access_broadcast = tf.tile(access1h[:,np.newaxis,:],[1, self.MaxTs, 1])
+        if self.use_metadata:
+            access_broadcast = tf.tile(access1h[:,np.newaxis,:],[1, self.max_delay, 1])
             ret = tf.concat([ret, access_broadcast], axis=2)
 
-        if self.usePastYear:
-            pastYear = inputs[:, -self.MaxTs-365+output_len:-365+output_len, np.newaxis]
-            ret = tf.concat([ret, pastYear], axis=2)
+        if self.use_past_year:
+            past_year = inputs[:, -self.max_delay - 365 + output_len: -365 + output_len, np.newaxis]
+            ret = tf.concat([ret, past_year], axis=2)
         return ret
 
+    def get_config(self):
+        return {'max_delay': int(self.max_delay), 'use_metadata': self.use_metadata, 'use_past_year': self.use_past_year}
 
-def get_rnn_model(_Seq2seq, Nneurons=20, Nlayers=1, MaxTs=50, usePastYear=False, useMetadata=False):
+
+def get_rnn_model(_Seq2seq, Nneurons=20, Nlayers=1, max_delay=50, use_past_year=False, use_metadata=False):
 
     output_len = 62
     I_page = tf.keras.layers.Input(shape=(), dtype=object)
-    I_traffic = tf.keras.layers.Input(shape=(None,))
+    I_traffic = tf.keras.layers.Input(shape=(max_delay,))
 
     voc_access = ['all-access_all-agents', 'all-access_spider', 'desktop_all-agents',
                   'mobile-web_all-agents']
     access1h = OneHotEncodingLayer(voc_access, name="ohAccess")(I_page)
 
     x, factors = normalize_rnn()(I_traffic)
-    x = preprocessing_rnn(MaxTs, useMetadata, usePastYear)(x, access1h)
+    x = preprocessing_rnn(max_delay, use_metadata, use_past_year)(x, access1h)
     for ii in range(Nlayers-1):
         x = tf.keras.layers.GRU(Nneurons, return_sequences=True)(x)
     x = tf.keras.layers.GRU(Nneurons, return_sequences=_Seq2seq, name="gru0")(x)
@@ -76,7 +80,7 @@ def get_rnn_model(_Seq2seq, Nneurons=20, Nlayers=1, MaxTs=50, usePastYear=False,
         x= tf.keras.layers.Dense(output_len, name="dense0")(x)
     else:
         x = keras.layers.TimeDistributed(keras.layers.Dense(output_len), name="td")(x)
-        factors = tf.cast(tf.tile(tf.expand_dims(factors, axis=1), (1, MaxTs, output_len)), tf.float32)
+        factors = tf.cast(tf.tile(tf.expand_dims(factors, axis=1), (1, max_delay, output_len)), tf.float32)
 
     outputs= tf.multiply(x, factors)
 
