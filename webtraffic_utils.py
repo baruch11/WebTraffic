@@ -208,3 +208,20 @@ def plot_check_result(df_train, page, models):
 
     f.suptitle(page)
     plt.show()
+
+
+def make_seq2seq_dataset(df):
+    """ seq2seq training/test as tf.dataset in order to save memory """
+    bsz, nsmp = df.shape
+    rnn_delay = nsmp-62
+    ds = tf.data.Dataset.from_tensor_slices((df.index, df))
+
+    def target_seq2seq(index, df):
+        #target = tf.zeros((bsz, rnn_delay, 62))
+        tgt_list = []
+        for ii in range(rnn_delay):
+            last = 62+ii+1
+            tgt_list.append(df[last-62:last])
+        return (index, df[:-62]), tf.stack(tgt_list)
+
+    return ds.map(target_seq2seq)
