@@ -27,15 +27,6 @@ class OneHotEncodingLayer(tf.keras.layers.experimental.preprocessing.Preprocessi
         return {'vocabulary': list(self.vocabulary), 'depth': int(self.depth)}
 
 
-
-class normalize_rnn(tf.keras.layers.Layer):
-    """ divide each row independently by its max"""
-    def call(self, inputs):
-        fact = tf.reduce_max(inputs, axis=1, keepdims=True)
-        ret = tf.divide(inputs, fact + 1e-10)
-        return ret, fact
-
-
 class preprocessing_rnn(tf.keras.layers.Layer):
     """ layer in charge of the inputs of the rnn """
     def __init__(self, max_delay=100, use_metadata=False, use_past_year= False, **kwargs):
@@ -70,7 +61,9 @@ def get_rnn_model(_Seq2seq, Nneurons=20, Nlayers=1, max_delay=50, use_past_year=
                   'mobile-web_all-agents']
     access1h = OneHotEncodingLayer(voc_access, name="ohAccess")(I_page)
 
-    x, factors = normalize_rnn()(I_traffic)
+    factors = tf.reduce_max(I_traffic, axis=1, keepdims=True)
+    x = tf.divide(I_traffic, factors + 1e-10)
+
     x = preprocessing_rnn(max_delay, use_metadata, use_past_year)(x, access1h)
     for ii in range(Nlayers-1):
         x = tf.keras.layers.GRU(Nneurons, return_sequences=True)(x)
@@ -82,7 +75,7 @@ def get_rnn_model(_Seq2seq, Nneurons=20, Nlayers=1, max_delay=50, use_past_year=
         x = keras.layers.TimeDistributed(keras.layers.Dense(output_len), name="td")(x)
         factors = tf.cast(tf.tile(tf.expand_dims(factors, axis=1), (1, max_delay, output_len)), tf.float32)
 
-    outputs= tf.multiply(x, factors)
+    outputs = tf.multiply(x, factors)
 
     model_rnn = tf.keras.Model(inputs=[I_page, I_traffic], outputs=[outputs])
 
