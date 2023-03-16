@@ -1,0 +1,19 @@
+name: webtraffic
+channels:
+  - apple
+  - conda-forge
+dependencies:
+  - python=3.10  ## specify desired version
+  - pip
+  - tensorflow-deps
+
+  ## uncomment for use with Jupyter
+  - ipykernel
+
+  ## PyPI packages
+  - pip:
+    - tensorflow-macos==2.9.2
+    - tensorflow-metal==0.5.0
+    - pandas
+    - matplotlib
+    - tensorflow_probability==0.17.0
