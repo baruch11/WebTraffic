@@ -17,3 +17,4 @@ dependencies:
     - pandas
     - matplotlib
     - tensorflow_probability==0.17.0
+    - pytest

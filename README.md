@@ -9,6 +9,7 @@ Competition link : https://www.kaggle.com/competitions/web-traffic-time-series-f
 ```
 conda env create -n webtraffic -f conda-env.yaml
 conda activate webtraffic
+pip install -e .
 ```
 
 ## Data download
