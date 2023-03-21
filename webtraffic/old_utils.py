@@ -84,52 +84,6 @@ def get_rnn_model(_Seq2seq, Nneurons=20, Nlayers=1, max_delay=50, use_past_year=
 
 
 
-
-def smape(A, F):
-    return tf.reduce_mean(2 * tf.math.abs(F - A) / (tf.math.abs(A) + tf.math.abs(F) + 1e-16)) * 100
-
-
-def smape_reg(ypred, ytrue):
-    A = tf.cast(ypred, tf.float32)
-    F = tf.cast(ytrue, tf.float32)
-    epsilon = 0.1
-    summ = tf.maximum(tf.abs(A) + tf.abs(F) + epsilon, 0.5 + epsilon)
-    return  tf.reduce_mean( 2* tf.abs(A - F) / summ) * 100
-
-
-class SmapeMetric(tf.keras.losses.Loss):
-    def __init__(self, name="smape", **kwargs):
-        super().__init__(name=name, **kwargs)
-
-    def call(self, y_true, y_pred):
-        return smape(y_pred, y_true)
-
-    def get_config(self):
-        base_config = super().get_config()
-        return {**base_config}
-
-
-class SmapeLoss(tf.keras.losses.Loss):
-    def __init__(self, name="smape_reg", **kwargs):
-        super().__init__(name=name, **kwargs)
-
-    def call(self, y_true, y_pred):
-        return smape_reg(y_pred, y_true)
-
-    def get_config(self):
-        base_config = super().get_config()
-        return {**base_config}
-
-
-def smape_np(A, F):
-    return 100/A.size * np.sum(2 * np.abs(F - A) / (np.abs(A) + np.abs(F) + np.finfo(float).eps))
-
-
-def create_tb_cb(model_name):
-    return tf.keras.callbacks.TensorBoard(log_dir="./logs/"+datetime.now().strftime("%m-%d-%H-%M-%S")+"-"+model_name,
-                                          histogram_freq=10)
-
-
 def estimated_autocorrelation(x):
     """
     http://stackoverflow.com/q/14297012/190597
