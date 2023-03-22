@@ -50,6 +50,32 @@ class VizualizeResults:
         return smape_np(y_true.values, y_pred.values)
 
 
+def estimated_autocorrelation(x):
+    """Compute autocorrelation.
+    http://stackoverflow.com/q/14297012/190597
+    http://en.wikipedia.org/wiki/Autocorrelation#Estimation
+    """
+    n = len(x)
+    variance = x.var()
+    x = x-x.mean()
+    r = np.correlate(x, x, mode = 'full')[-n:]
+    assert np.allclose(r, np.array([(x[:n-k]*x[-(n-k):]).sum() for k in range(n)]))
+    result = r/(variance*(np.arange(n, 0, -1)))
+    return result
+
+
+def plot_spectrest(x, ax):
+    """Compute and plot spectral estimation."""
+    fft = tf.signal.rfft(x-np.mean(x))
+    T = len(fft)
+    ax.plot(np.abs(fft))
+    ax.set_yscale("log")
+    ax.grid()
+    ax.set_xscale("log")
+    ax.set_xticks([2*T/7., 2*T/30.5, 2*T/365.])
+    ax.set_xticklabels(["weekly", "monthly", "yearly"], rotation=30)
+
+
 # common tensorflow model utils
 
 

@@ -1,15 +1,83 @@
-from datetime import datetime
+"""RNN model."""
+from dataclasses import dataclass, field
 import tensorflow as tf
 import numpy as np
-from tensorflow.keras import layers
-import matplotlib.pyplot as plt
 from tensorflow import keras
 
+from webtraffic.webtraffic_utils import SmapeMetric, SmapeLoss, create_tb_cb
 
 
-# rnn
+@dataclass
+class rnn_model:
+    """RNN model."""
+
+    input_shape: int
+    output_len: int
+    seq2seq: bool = False
+    Nneurons: int = 20
+    Nlayers: int = 1
+    max_delay: int = 50
+    model: tf.keras.layers.Layer = field(init=False)
+    epochs: int = 100
+
+    def __post_init__(self):
+        """Build & compile the model."""
+        I_traffic = tf.keras.layers.Input(shape=(self.input_shape,))
+
+        traffic_lim = I_traffic[:, -self.max_delay:]
+        factors = tf.reduce_max(traffic_lim, axis=1, keepdims=True)
+        x = tf.divide(traffic_lim, factors + 1e-10)
+
+        x = x[:, :, np.newaxis]
+
+        for ii in range(self.Nlayers-1):
+            x = tf.keras.layers.GRU(self.Nneurons, return_sequences=True)(x)
+        x = tf.keras.layers.GRU(self.Nneurons, return_sequences=self.seq2seq,
+                                name="gru0")(x)
+
+        if not self.seq2seq:
+            x = tf.keras.layers.Dense(self.output_len, name="dense0")(x)
+        else:
+            x = keras.layers.TimeDistributed(
+                keras.layers.Dense(self.output_len), name="td")(x)
+            factors = tf.cast(tf.tile(tf.expand_dims(factors, axis=1),
+                                      (1, self.max_delay, self.output_len)),
+                              tf.float32)
+
+        outputs = tf.multiply(x, factors)
+        self.model = tf.keras.Model(inputs=[I_traffic], outputs=[outputs])
+
+        self.model.compile(loss=SmapeLoss(),
+                           optimizer=tf.optimizers.Adam(learning_rate=1e-3),
+                           metrics=[SmapeMetric()])
+
+    def fit(self, X_train: np.array, Y_train: np.array, val_data=None):
+        """Fit the model."""
+        es_cb = tf.keras.callbacks.EarlyStopping(
+            monitor='val_smape', min_delta=0.1, patience=10,
+            verbose=0, restore_best_weights=True)
+
+        tb_cb = create_tb_cb("rnn")
+
+        self.model.fit(X_train, Y_train, epochs=self.epochs,
+                       callbacks=[tb_cb, es_cb],
+                       batch_size=32,
+                       validation_data=val_data)
+
+    def predict(self, X_train: np.array):
+        """Predict forecast from X_train.
+
+        Returns
+        -------
+        np.array
+            predictions
+        """
+        return self.model.predict(X_train)
+
+
 class OneHotEncodingLayer(tf.keras.layers.experimental.preprocessing.PreprocessingLayer):
     """ one hot encoding layer """
+
     def __init__(self, vocabulary=None, depth=None, **kwargs):
         super().__init__(**kwargs)
         self.vocabulary = vocabulary
@@ -21,11 +89,11 @@ class OneHotEncodingLayer(tf.keras.layers.experimental.preprocessing.Preprocessi
             self.depth = self.table_ohe.size()
 
     def call(self,inputs):
-        return  tf.one_hot(self.table_ohe.lookup(inputs), depth=tf.cast(self.depth, tf.int32))
+        return  tf.one_hot(self.table_ohe.lookup(inputs),
+                           depth=tf.cast(self.depth, tf.int32))
 
     def get_config(self):
         return {'vocabulary': list(self.vocabulary), 'depth': int(self.depth)}
-
 
 class preprocessing_rnn(tf.keras.layers.Layer):
     """ layer in charge of the inputs of the rnn """
@@ -84,31 +152,6 @@ def get_rnn_model(_Seq2seq, Nneurons=20, Nlayers=1, max_delay=50, use_past_year=
 
 
 
-def estimated_autocorrelation(x):
-    """
-    http://stackoverflow.com/q/14297012/190597
-    http://en.wikipedia.org/wiki/Autocorrelation#Estimation
-    """
-    n = len(x)
-    variance = x.var()
-    x = x-x.mean()
-    r = np.correlate(x, x, mode = 'full')[-n:]
-    assert np.allclose(r, np.array([(x[:n-k]*x[-(n-k):]).sum() for k in range(n)]))
-    result = r/(variance*(np.arange(n, 0, -1)))
-    return result
-
-
-def plot_spectrest(x, ax):
-    fft = tf.signal.rfft(x-np.mean(x))
-    T = len(fft)
-    ax.plot(np.abs(fft))
-    ax.set_yscale("log")
-    ax.grid()
-    ax.set_xscale("log")
-    ax.set_xticks([2*T/7., 2*T/30.5, 2*T/365.])
-    ax.set_xticklabels(["weekly", "monthly", "yearly"], rotation=30)
-
-
 def ds_from_dataframe(df):
     output_len = 62
     page = df["Page"]
@@ -134,27 +177,6 @@ def get_model_inputs(df_augmented, return_seq=0):
             output[:,ii,:] = df_train.iloc[:,last-62:last]
     return inputs, output
 
-
-def plot_check_result(df_train, page, models):
-    """ df: dataframe from original csv file """
-    features, target = get_model_inputs(df_train.loc[[page]])
-    f, vax = plt.subplots(len(models),2, figsize=(10,4*len(models)))
-    fax = vax.flat
-
-    for model in models:
-        smape_score = model.evaluate(features, target, verbose=0)[1]
-        pred = model.predict(features, verbose=0)[0]
-
-        ax= next(fax)
-        ax.set_title("smape: {:.2f}".format(smape_score))
-        ax.plot(target.reshape(-1,), label="pred")
-        ax.plot(pred.reshape(-1,), label="prediction")
-        ax1= next(fax)
-        ax1.plot(df_train.loc[page].values)
-        ax1.plot(np.arange(0,len(pred))+len(features[1].reshape(-1,1)),pred)
-
-    f.suptitle(page)
-    plt.show()
 
 
 def make_seq2seq_dataset(df):

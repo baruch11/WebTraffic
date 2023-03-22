@@ -9,10 +9,11 @@ from webtraffic.inout import (load_data, get_training_datasets, Submission,
                               get_root_dir)
 from webtraffic.models.median_model import median_model
 from webtraffic.models.linear_model import linear_model
+from webtraffic.models.rnn_model import rnn_model
 from webtraffic.webtraffic_utils import smape_np
 
 
-MODELS = [linear_model, median_model]
+MODELS = [rnn_model, linear_model, median_model]
 
 parser = argparse.ArgumentParser(
     description='Main script for training and submitting')
@@ -22,7 +23,7 @@ parser.add_argument('--nsamp', '-n', type=int, default=None,
 parser.add_argument('--epochs', '-e', type=int, default=100,
                     help="Max epochs"
                     "(all samples if None (default))")
-parser.add_argument('--model', '-m', type=str, default=MODELS[0],
+parser.add_argument('--model', '-m', type=str, default=MODELS[0].__name__,
                     help=f"Model to train in {[ii.__name__ for ii in MODELS]}")
 
 args = parser.parse_args()
