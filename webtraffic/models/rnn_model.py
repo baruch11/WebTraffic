@@ -27,10 +27,10 @@ class rnn_model:
 
     def __post_init__(self):
         """Build & compile the model."""
-        I_median = Input(1,)
-        I_traffic = Input(shape=(self.max_delay,))
+        I_median = Input(1, name="median")
+        I_traffic = Input(shape=(self.max_delay, 2,), name="time datas")
 
-        x = I_traffic[:, :, np.newaxis]
+        x = I_traffic
 
         for ii in range(self.Nlayers-1):
             x = tf.keras.layers.GRU(self.Nneurons, return_sequences=True)(x)
@@ -81,7 +81,15 @@ class rnn_model:
         np_train = X_train.values
         median = np.median(np_train[:, -self.Lmedian:], axis=1)
         scaled_x = (np_train - self.mean) / self.std
-        time_datas = scaled_x[:, -self.max_delay:]
+        scaled_x = scaled_x[:, -self.max_delay:]
+
+        weekday = pd.to_datetime(X_train.columns).weekday.\
+            values[-self.max_delay:]
+        weekday = (weekday - 3.5) / 3.5
+        weekday = np.repeat(weekday.reshape(1, -1),
+                            X_train.shape[0], axis=0)
+
+        time_datas = np.stack([scaled_x, weekday], axis=-1)
 
         return [time_datas, median]
 
