@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import tensorflow as tf
 import numpy as np
 from tensorflow import keras
+from tensorflow.keras.layers import Input
 
 from webtraffic.webtraffic_utils import SmapeMetric, SmapeLoss, create_tb_cb
 
@@ -17,35 +18,36 @@ class rnn_model:
     Nneurons: int = 20
     Nlayers: int = 1
     max_delay: int = 50
+    Lmedian: int = 40
     model: tf.keras.layers.Layer = field(init=False)
     epochs: int = 100
+    mean: np.array = field(init=False)
+    std: np.array = field(init=False)
 
     def __post_init__(self):
         """Build & compile the model."""
+        I_median = Input(1,)
         I_traffic = tf.keras.layers.Input(shape=(self.input_shape,))
 
         traffic_lim = I_traffic[:, -self.max_delay:]
-        factors = tf.reduce_max(traffic_lim, axis=1, keepdims=True)
-        x = tf.divide(traffic_lim, factors + 1e-10)
 
-        x = x[:, :, np.newaxis]
+        x = traffic_lim[:, :, np.newaxis]
 
         for ii in range(self.Nlayers-1):
             x = tf.keras.layers.GRU(self.Nneurons, return_sequences=True)(x)
         x = tf.keras.layers.GRU(self.Nneurons, return_sequences=self.seq2seq,
                                 name="gru0")(x)
 
-        if not self.seq2seq:
-            x = tf.keras.layers.Dense(self.output_len, name="dense0")(x)
-        else:
-            x = keras.layers.TimeDistributed(
-                keras.layers.Dense(self.output_len), name="td")(x)
-            factors = tf.cast(tf.tile(tf.expand_dims(factors, axis=1),
-                                      (1, self.max_delay, self.output_len)),
-                              tf.float32)
+        x = tf.concat([x, I_median], axis=1)
 
-        outputs = tf.multiply(x, factors)
-        self.model = tf.keras.Model(inputs=[I_traffic], outputs=[outputs])
+        if not self.seq2seq:
+            outputs = tf.keras.layers.Dense(self.output_len, name="dense0")(x)
+        else:
+            outputs = keras.layers.TimeDistributed(
+                keras.layers.Dense(self.output_len), name="td")(x)
+
+        self.model = tf.keras.Model(inputs=[I_traffic, I_median],
+                                    outputs=[outputs])
 
         self.model.compile(loss=SmapeLoss(),
                            optimizer=tf.optimizers.Adam(learning_rate=1e-3),
@@ -59,10 +61,23 @@ class rnn_model:
 
         tb_cb = create_tb_cb("rnn")
 
-        self.model.fit(X_train, Y_train, epochs=self.epochs,
+        median = np.median(X_train[:, -self.Lmedian:], axis=1)
+        self.mean = np.mean(X_train, axis=1).reshape(-1, 1)
+        self.std = np.std(X_train - self.mean).reshape(-1, 1) + 1e-10
+
+        vd = val_data
+        if val_data is not None:
+            X_val, Y_val = val_data
+            vd = ([(X_val - self.mean) / self.std,
+                   np.median(X_val[:, -self.Lmedian:], axis=1)],
+                  Y_val)
+
+        self.model.fit([(X_train - self.mean) / self.std, median],
+                       Y_train,
+                       epochs=self.epochs,
                        callbacks=[tb_cb, es_cb],
                        batch_size=32,
-                       validation_data=val_data)
+                       validation_data=vd)
 
     def predict(self, X_train: np.array):
         """Predict forecast from X_train.
@@ -72,7 +87,11 @@ class rnn_model:
         np.array
             predictions
         """
-        return self.model.predict(X_train)
+        median = np.median(X_train[:, -self.Lmedian:], axis=1)
+        X_scaled = (X_train - self.mean) / self.std
+        rnn_out = self.model.predict([X_scaled, median])
+        ret = np.clip(rnn_out, a_min=0, a_max=None).astype(np.int32)
+        return ret
 
 
 class OneHotEncodingLayer(tf.keras.layers.experimental.preprocessing.PreprocessingLayer):

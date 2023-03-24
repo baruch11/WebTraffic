@@ -30,6 +30,7 @@ args = parser.parse_args()
 
 logging.getLogger().setLevel(logging.INFO)
 
+
 print("loading traffic dataset.")
 traffic = load_data(args.nsamp)
 print(f"Loaded traffic of {len(traffic)} pages")
@@ -43,7 +44,8 @@ for modname in MODELS:
                         epochs=args.epochs)
 
 print("Fitting the model")
-model.fit(X_train, Y_train, val_data=(X_test, Y_test))
+model.fit(X_train.values, Y_train.values,
+          val_data=(X_test.values, Y_test.values))
 
 print("Model evaluation\n")
 train_pred = model.predict(X_train.values)
