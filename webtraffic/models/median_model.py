@@ -1,5 +1,6 @@
 """Simple model that repeats the median of the n last values."""
 import numpy as np
+import pandas as pd
 from dataclasses import dataclass
 
 
@@ -17,7 +18,7 @@ class median_model:
         self.output_len = Y_train.shape[1]
         return self
 
-    def predict(self, X_train: np.array):
+    def predict(self, X_train: pd.DataFrame):
         """Predict forecast from X_train.
 
         Returns
@@ -25,7 +26,7 @@ class median_model:
         np.array
             predictions
         """
-        medians = np.median(X_train[:, -self.median_depth:], axis=1)
+        medians = np.median(X_train.values[:, -self.median_depth:], axis=1)
         medians = medians.reshape(-1, 1)
         medians = np.clip(medians, a_min=0, a_max=None).astype(np.int32)
 

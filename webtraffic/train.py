@@ -44,12 +44,12 @@ for modname in MODELS:
                         epochs=args.epochs)
 
 print("Fitting the model")
-model.fit(X_train.values, Y_train.values,
-          val_data=(X_test.values, Y_test.values))
+model.fit(X_train, Y_train,
+          val_data=(X_test, Y_test))
 
 print("Model evaluation\n")
-train_pred = model.predict(X_train.values)
-test_pred = model.predict(X_test.values)
+train_pred = model.predict(X_train)
+test_pred = model.predict(X_test)
 
 print(pd.Series(index=["train", "test"],
                 data=[smape_np(train_pred, Y_train.values),
@@ -60,7 +60,7 @@ print(pd.Series(index=["train", "test"],
 
 # exporting the predictions
 print("Predicting for submission")
-final_preds = model.predict(traffic.values[:, -X_train.shape[1]:])
+final_preds = model.predict(traffic.iloc[:, -X_train.shape[1]:])
 
 keys_path = os.path.join(get_root_dir(),
                          "data/web-traffic-time-series-forecasting",

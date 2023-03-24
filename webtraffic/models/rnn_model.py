@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 from tensorflow import keras
 from tensorflow.keras.layers import Input
 
@@ -53,7 +54,7 @@ class rnn_model:
                            optimizer=tf.optimizers.Adam(learning_rate=1e-3),
                            metrics=[SmapeMetric()])
 
-    def fit(self, X_train: np.array, Y_train: np.array, val_data=None):
+    def fit(self, X_train: pd.DataFrame, Y_train: pd.DataFrame, val_data=None):
         """Fit the model."""
         es_cb = tf.keras.callbacks.EarlyStopping(
             monitor='val_smape', min_delta=0.1, patience=10,
@@ -61,25 +62,26 @@ class rnn_model:
 
         tb_cb = create_tb_cb("rnn")
 
-        median = np.median(X_train[:, -self.Lmedian:], axis=1)
-        self.mean = np.mean(X_train, axis=1).reshape(-1, 1)
-        self.std = np.std(X_train - self.mean).reshape(-1, 1) + 1e-10
+        np_train = X_train.values
+        median = np.median(np_train[:, -self.Lmedian:], axis=1)
+        self.mean = np.mean(np_train, axis=1).reshape(-1, 1)
+        self.std = np.std(np_train - self.mean).reshape(-1, 1) + 1e-10
 
         vd = val_data
         if val_data is not None:
             X_val, Y_val = val_data
-            vd = ([(X_val - self.mean) / self.std,
-                   np.median(X_val[:, -self.Lmedian:], axis=1)],
-                  Y_val)
+            vd = ([(X_val.values - self.mean) / self.std,
+                   np.median(X_val.values[:, -self.Lmedian:], axis=1)],
+                  Y_val.values)
 
-        self.model.fit([(X_train - self.mean) / self.std, median],
-                       Y_train,
+        self.model.fit([(np_train - self.mean) / self.std, median],
+                       Y_train.values,
                        epochs=self.epochs,
                        callbacks=[tb_cb, es_cb],
                        batch_size=32,
                        validation_data=vd)
 
-    def predict(self, X_train: np.array):
+    def predict(self, X_train: pd.DataFrame):
         """Predict forecast from X_train.
 
         Returns
@@ -87,8 +89,8 @@ class rnn_model:
         np.array
             predictions
         """
-        median = np.median(X_train[:, -self.Lmedian:], axis=1)
-        X_scaled = (X_train - self.mean) / self.std
+        median = np.median(X_train.values[:, -self.Lmedian:], axis=1)
+        X_scaled = (X_train.values - self.mean) / self.std
         rnn_out = self.model.predict([X_scaled, median])
         ret = np.clip(rnn_out, a_min=0, a_max=None).astype(np.int32)
         return ret
