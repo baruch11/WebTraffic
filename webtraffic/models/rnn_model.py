@@ -28,11 +28,9 @@ class rnn_model:
     def __post_init__(self):
         """Build & compile the model."""
         I_median = Input(1,)
-        I_traffic = tf.keras.layers.Input(shape=(self.input_shape,))
+        I_traffic = Input(shape=(self.max_delay,))
 
-        traffic_lim = I_traffic[:, -self.max_delay:]
-
-        x = traffic_lim[:, :, np.newaxis]
+        x = I_traffic[:, :, np.newaxis]
 
         for ii in range(self.Nlayers-1):
             x = tf.keras.layers.GRU(self.Nneurons, return_sequences=True)(x)
@@ -62,24 +60,30 @@ class rnn_model:
 
         tb_cb = create_tb_cb("rnn")
 
-        np_train = X_train.values
-        median = np.median(np_train[:, -self.Lmedian:], axis=1)
-        self.mean = np.mean(np_train, axis=1).reshape(-1, 1)
-        self.std = np.std(np_train - self.mean).reshape(-1, 1) + 1e-10
+        self.mean = X_train.mean(axis=1).values.reshape(-1, 1)
+        self.std = X_train.std(axis=1).values.reshape(-1, 1) + 1e-10
 
         vd = val_data
         if val_data is not None:
             X_val, Y_val = val_data
-            vd = ([(X_val.values - self.mean) / self.std,
-                   np.median(X_val.values[:, -self.Lmedian:], axis=1)],
+            vd = (self._features_preparation(X_val),
                   Y_val.values)
 
-        self.model.fit([(np_train - self.mean) / self.std, median],
+        self.model.fit(self._features_preparation(X_train),
                        Y_train.values,
                        epochs=self.epochs,
                        callbacks=[tb_cb, es_cb],
                        batch_size=32,
                        validation_data=vd)
+
+    def _features_preparation(self, X_train: pd.DataFrame):
+        """Compute feature engineering."""
+        np_train = X_train.values
+        median = np.median(np_train[:, -self.Lmedian:], axis=1)
+        scaled_x = (np_train - self.mean) / self.std
+        time_datas = scaled_x[:, -self.max_delay:]
+
+        return [time_datas, median]
 
     def predict(self, X_train: pd.DataFrame):
         """Predict forecast from X_train.
@@ -89,9 +93,7 @@ class rnn_model:
         np.array
             predictions
         """
-        median = np.median(X_train.values[:, -self.Lmedian:], axis=1)
-        X_scaled = (X_train.values - self.mean) / self.std
-        rnn_out = self.model.predict([X_scaled, median])
+        rnn_out = self.model.predict(self._features_preparation(X_train))
         ret = np.clip(rnn_out, a_min=0, a_max=None).astype(np.int32)
         return ret
 
