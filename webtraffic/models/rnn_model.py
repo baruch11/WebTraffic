@@ -22,11 +22,10 @@ class rnn_model:
     Lmedian: int = 40
     model: tf.keras.layers.Layer = field(init=False)
     epochs: int = 100
-    mean: np.array = field(init=False)
-    std: np.array = field(init=False)
 
     def __post_init__(self):
         """Build & compile the model."""
+        I_std = Input(1, name="std")
         I_median = Input(1, name="median")
         I_traffic = Input(shape=(self.max_delay, 2,), name="time datas")
 
@@ -37,15 +36,16 @@ class rnn_model:
         x = tf.keras.layers.GRU(self.Nneurons, return_sequences=self.seq2seq,
                                 name="gru0")(x)
 
-        x = tf.concat([x, I_median], axis=1)
 
         if not self.seq2seq:
-            outputs = tf.keras.layers.Dense(self.output_len, name="dense0")(x)
+            x = tf.keras.layers.Dense(self.output_len, name="dense0")(x)
         else:
-            outputs = keras.layers.TimeDistributed(
+            x = keras.layers.TimeDistributed(
                 keras.layers.Dense(self.output_len), name="td")(x)
 
-        self.model = tf.keras.Model(inputs=[I_traffic, I_median],
+        outputs = x * I_std + I_median
+
+        self.model = tf.keras.Model(inputs=[I_traffic, I_median, I_std],
                                     outputs=[outputs])
 
         self.model.compile(loss=SmapeLoss(),
@@ -59,9 +59,6 @@ class rnn_model:
             verbose=0, restore_best_weights=True)
 
         tb_cb = create_tb_cb("rnn")
-
-        self.mean = X_train.mean(axis=1).values.reshape(-1, 1)
-        self.std = X_train.std(axis=1).values.reshape(-1, 1) + 1e-10
 
         vd = val_data
         if val_data is not None:
@@ -80,7 +77,11 @@ class rnn_model:
         """Compute feature engineering."""
         np_train = X_train.values
         median = np.median(np_train[:, -self.Lmedian:], axis=1)
-        scaled_x = (np_train - self.mean) / self.std
+
+        x_mean = X_train.mean(axis=1).values.reshape(-1, 1)
+        x_std = X_train.std(axis=1).values.reshape(-1, 1) + 1e-10
+
+        scaled_x = (np_train - x_mean) / x_std
         scaled_x = scaled_x[:, -self.max_delay:]
 
         weekday = pd.to_datetime(X_train.columns).weekday.\
@@ -91,7 +92,7 @@ class rnn_model:
 
         time_datas = np.stack([scaled_x, weekday], axis=-1)
 
-        return [time_datas, median]
+        return [time_datas, x_mean, x_std]
 
     def predict(self, X_train: pd.DataFrame):
         """Predict forecast from X_train.
