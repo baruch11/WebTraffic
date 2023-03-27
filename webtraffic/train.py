@@ -25,6 +25,8 @@ parser.add_argument('--epochs', '-e', type=int, default=100,
                     "(all samples if None (default))")
 parser.add_argument('--model', '-m', type=str, default=MODELS[0].__name__,
                     help=f"Model to train in {[ii.__name__ for ii in MODELS]}")
+parser.add_argument('--val', '-v', action='store_true',
+                    help='Compute validation score')
 
 args = parser.parse_args()
 
@@ -44,8 +46,11 @@ for modname in MODELS:
                         epochs=args.epochs)
 
 print("Fitting the model")
-model.fit(X_train, Y_train,
-          val_data=(X_test, Y_test))
+
+val_data = None
+if args.val:
+    val_data = (X_test, Y_test)
+model.fit(X_train, Y_train, val_data=val_data)
 
 print("Model evaluation\n")
 train_pred = model.predict(X_train)
