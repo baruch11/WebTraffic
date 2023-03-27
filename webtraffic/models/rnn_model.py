@@ -26,8 +26,8 @@ class rnn_model:
     def __post_init__(self):
         """Build & compile the model."""
         I_std = Input(1, name="std")
-        I_median = Input(1, name="median")
-        I_traffic = Input(shape=(self.max_delay, 2,), name="time datas")
+        I_mean = Input(1, name="median")
+        I_traffic = Input(shape=(self.max_delay, 3,), name="time datas")
 
         x = I_traffic
 
@@ -43,9 +43,9 @@ class rnn_model:
             x = keras.layers.TimeDistributed(
                 keras.layers.Dense(self.output_len), name="td")(x)
 
-        outputs = x * I_std + I_median
+        outputs = x * I_std + I_mean
 
-        self.model = tf.keras.Model(inputs=[I_traffic, I_median, I_std],
+        self.model = tf.keras.Model(inputs=[I_traffic, I_mean, I_std],
                                     outputs=[outputs])
 
         self.model.compile(loss=SmapeLoss(),
@@ -76,7 +76,8 @@ class rnn_model:
     def _features_preparation(self, X_train: pd.DataFrame):
         """Compute feature engineering."""
         np_train = X_train.values
-        median = np.median(np_train[:, -self.Lmedian:], axis=1)
+        median = np.median(np_train[:, -self.Lmedian:], axis=1).reshape(-1, 1)
+        median = np.repeat(median, self.max_delay, axis=1)
 
         x_mean = X_train.mean(axis=1).values.reshape(-1, 1)
         x_std = X_train.std(axis=1).values.reshape(-1, 1) + 1e-10
@@ -90,7 +91,7 @@ class rnn_model:
         weekday = np.repeat(weekday.reshape(1, -1),
                             X_train.shape[0], axis=0)
 
-        time_datas = np.stack([scaled_x, weekday], axis=-1)
+        time_datas = np.stack([scaled_x, weekday, median], axis=-1)
 
         return [time_datas, x_mean, x_std]
 
