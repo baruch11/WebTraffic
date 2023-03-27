@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import tensorflow as tf
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.layers import Input
 
@@ -19,7 +20,6 @@ class rnn_model:
     Nneurons: int = 20
     Nlayers: int = 1
     max_delay: int = 50
-    Lmedian: int = 40
     model: tf.keras.layers.Layer = field(init=False)
     epochs: int = 100
 
@@ -43,7 +43,7 @@ class rnn_model:
             x = keras.layers.TimeDistributed(
                 keras.layers.Dense(self.output_len), name="td")(x)
 
-        outputs = x * I_std + I_mean
+        outputs = tf.math.expm1(x * I_std + I_mean)
 
         self.model = tf.keras.Model(inputs=[I_traffic, I_mean, I_std],
                                     outputs=[outputs])
@@ -75,12 +75,15 @@ class rnn_model:
 
     def _features_preparation(self, X_train: pd.DataFrame):
         """Compute feature engineering."""
-        np_train = X_train.values
-        median = np.median(np_train[:, -self.Lmedian:], axis=1).reshape(-1, 1)
+        np_train = np.log1p(X_train.values[:, -self.max_delay:])
+
+        median = np.median(np_train, axis=1).reshape(-1, 1)
+        median = median - np.mean(median)
+        median = median / np.std(median)
         median = np.repeat(median, self.max_delay, axis=1)
 
-        x_mean = X_train.mean(axis=1).values.reshape(-1, 1)
-        x_std = X_train.std(axis=1).values.reshape(-1, 1) + 1e-10
+        x_mean = np.mean(np_train, axis=1).reshape(-1, 1)
+        x_std = (np.std(np_train, axis=1) + 1e-10).reshape(-1, 1)
 
         scaled_x = (np_train - x_mean) / x_std
         scaled_x = scaled_x[:, -self.max_delay:]
