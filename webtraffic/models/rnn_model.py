@@ -27,7 +27,7 @@ class rnn_model:
         """Build & compile the model."""
         I_std = Input(1, name="std")
         I_mean = Input(1, name="median")
-        I_traffic = Input(shape=(self.max_delay, 3,), name="time datas")
+        I_traffic = Input(shape=(self.max_delay, 6,), name="time datas")
 
         x = I_traffic
 
@@ -84,9 +84,7 @@ class rnn_model:
 
         x_mean = np.mean(np_train, axis=1).reshape(-1, 1)
         x_std = (np.std(np_train, axis=1) + 1e-10).reshape(-1, 1)
-
         scaled_x = (np_train - x_mean) / x_std
-        scaled_x = scaled_x[:, -self.max_delay:]
 
         weekday = pd.to_datetime(X_train.columns).weekday.\
             values[-self.max_delay:]
@@ -96,7 +94,26 @@ class rnn_model:
 
         time_datas = np.stack([scaled_x, weekday, median], axis=-1)
 
+        access = self._access_onehot_encode(X_train)
+        access = np.repeat(access[:, np.newaxis, :], self.max_delay, axis=1)
+        time_datas = np.concatenate((time_datas, access[:, :, :-1]), axis=-1)
+
         return [time_datas, x_mean, x_std]
+
+    def _access_onehot_encode(self, X_train):
+        """Return access one hot encode from X_train indexes."""
+        ret = np.zeros((len(X_train), 4))
+        for line, idx in enumerate(X_train.index):
+            access, agent = idx.split("_")[-2:]
+            encoding = 0
+            if access == "mobile-web":
+                encoding = 1
+            if access == "desktop":
+                encoding = 2
+            if agent == "spider":
+                encoding = 3
+            ret[line, encoding] = 1
+        return ret
 
     def predict(self, X_train: pd.DataFrame):
         """Predict forecast from X_train.
