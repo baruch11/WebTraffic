@@ -3,9 +3,8 @@ from dataclasses import dataclass, field
 import tensorflow as tf
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.layers import Input
+from tensorflow.keras.layers import Input, BatchNormalization
 
 from webtraffic.webtraffic_utils import SmapeMetric, SmapeLoss, create_tb_cb
 
@@ -36,6 +35,7 @@ class rnn_model:
         x = tf.keras.layers.GRU(self.Nneurons, return_sequences=self.seq2seq,
                                 name="gru0")(x)
 
+        x = BatchNormalization()(x)
 
         if not self.seq2seq:
             x = tf.keras.layers.Dense(self.output_len, name="dense0")(x)
@@ -43,7 +43,9 @@ class rnn_model:
             x = keras.layers.TimeDistributed(
                 keras.layers.Dense(self.output_len), name="td")(x)
 
-        outputs = tf.math.expm1(x * I_std + I_mean)
+        x = tf.math.expm1(x * I_std + I_mean)
+
+        outputs = tf.clip_by_value(x, clip_value_min=0, clip_value_max=100e6)
 
         self.model = tf.keras.Model(inputs=[I_traffic, I_mean, I_std],
                                     outputs=[outputs])
