@@ -83,7 +83,7 @@ def create_tb_cb(model_name):
     """Create a tf callback for tensorboard."""
     dirname = datetime.now().strftime("%m-%d-%H-%M-%S")+"-"+model_name
     log_dir = os.path.join(get_root_dir(), "logs", dirname)
-    return tf.keras.callbacks.TensorBoard(log_dir, histogram_freq=10)
+    return tf.keras.callbacks.TensorBoard(log_dir, histogram_freq=2)
 
 
 def smape(A, F):
