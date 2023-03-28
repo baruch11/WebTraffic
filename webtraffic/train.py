@@ -8,12 +8,12 @@ import logging
 from webtraffic.inout import (load_data, get_training_datasets, Submission,
                               get_root_dir)
 from webtraffic.models.median_model import median_model
-from webtraffic.models.linear_model import linear_model
+from webtraffic.models.dense_model import dense_model
 from webtraffic.models.rnn_model import rnn_model
 from webtraffic.webtraffic_utils import smape_np
 
 
-MODELS = [rnn_model, linear_model, median_model]
+MODELS = [rnn_model, dense_model, median_model]
 
 parser = argparse.ArgumentParser(
     description='Main script for training and submitting')

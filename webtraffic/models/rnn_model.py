@@ -25,7 +25,7 @@ class rnn_model:
     def __post_init__(self):
         """Build & compile the model."""
         I_std = Input(1, name="std")
-        I_mean = Input(1, name="median")
+        I_mean = Input(1, name="mean")
         I_traffic = Input(shape=(self.max_delay, 6,), name="time datas")
 
         x = I_traffic
@@ -33,7 +33,7 @@ class rnn_model:
         for ii in range(self.Nlayers-1):
             x = tf.keras.layers.GRU(self.Nneurons, return_sequences=True)(x)
         x = tf.keras.layers.GRU(self.Nneurons, return_sequences=self.seq2seq,
-                                name="gru0")(x)
+                                dropout=.5, name="gru0")(x)
 
         x = BatchNormalization()(x)
 
