@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 TRAIN_FIRST_DAY = '2015-07-01'
 TRAIN_LAST_DAY = '2017-09-10'
@@ -38,37 +38,61 @@ def load_data(nsamples=None):
     return traffic_ds
 
 
-def get_training_datasets(traffic):
-    """Return tuple of DataFrames used to train/test the model.
+@dataclass
+class training_dataset:
+    """Represents a training dataset with eventualy a validation dataset."""
 
-    split the dataset to maximize number of samples used
-    shape of _train (and test) are equal for X and Y
+    traffic: pd.DataFrame
+    pred_first_day: pd.Timestamp = pd.Timestamp(PRED_FIRST_DAY)
+    pred_last_day: pd.Timestamp = pd.Timestamp(PRED_LAST_DAY)
+    train_first_day: pd.Timestamp = field(init=False)
+    train_last_day: pd.Timestamp = field(init=False)
+    validation_set: int = True
 
-    Returns:
-    --------
-    X_train, X_test, Y_train, Y_test (pd.DataFrame)
-    """
-    horizon = _get_forecast_horizon()
-    lead = _get_lead_time()
-    Y_test = traffic.iloc[:, -horizon:]
-    x_last = -horizon-lead+1
-    Y_train = traffic.iloc[:, x_last-horizon:x_last]
-    X_train = traffic.iloc[:, :x_last-horizon-lead+1]
-    X_test = traffic.iloc[:, x_last-X_train.shape[1]:x_last]
+    def __post_init__(self):
+        """Complete init."""
+        self.train_first_day = pd.Timestamp(self.traffic.columns[0])
+        self.train_last_day = pd.Timestamp(self.traffic.columns[-1])
 
-    return X_train, X_test, Y_train, Y_test
+    def get_training_datasets(self):
+        """Return tuples of DataFrames used to train/test the model.
 
+        split the dataset to maximize number of samples used
+        shape of _train (and test) are equal for X and Y
 
-def _get_lead_time():
-    """Return prediction lead time."""
-    return (pd.Timestamp(PRED_FIRST_DAY) -
-            pd.Timestamp(TRAIN_LAST_DAY)).days
+        if validation_set is False then the training set is built
+        with the last values of self.traffic
 
+        Returns:
+        --------
+        train_tuple (pd.DataFrame)
+            (X_train, Y_train)
+        test_tuple (pd.DataFrame)
+            (X_test, Y_test) or None
+        """
+        horizon = self.get_forecast_horizon()
+        lead = self._get_lead_time()
+        Y_test = self.traffic.iloc[:, -horizon:]
+        x_last = -horizon-lead+1
+        Y_train = self.traffic.iloc[:, x_last-horizon:x_last]
+        X_train = self.traffic.iloc[:, :x_last-horizon-lead+1]
+        X_test = self.traffic.iloc[:, x_last-X_train.shape[1]:x_last]
 
-def _get_forecast_horizon():
-    """Return forecast horizon (how many days to predict)."""
-    return (pd.Timestamp(PRED_LAST_DAY) -
-            pd.Timestamp(PRED_FIRST_DAY)).days + 1
+        test_tuple = None
+        train_tuple = (X_test, Y_test)
+        if self.validation_set:
+            test_tuple = (X_test, Y_test)
+            train_tuple = (X_train, Y_train)
+
+        return train_tuple, test_tuple
+
+    def _get_lead_time(self):
+        """Return prediction lead time."""
+        return (self.pred_first_day - self.train_last_day).days
+
+    def get_forecast_horizon(self):
+        """Return forecast horizon (how many days to predict)."""
+        return (self.pred_last_day - self.pred_first_day).days + 1
 
 
 @dataclass

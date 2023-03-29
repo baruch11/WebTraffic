@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from tensorflow import keras
 from tensorflow.keras.layers import Input, BatchNormalization
-
+from webtraffic.inout import training_dataset
 from webtraffic.webtraffic_utils import SmapeMetric, SmapeLoss, create_tb_cb
 
 
@@ -13,16 +13,18 @@ from webtraffic.webtraffic_utils import SmapeMetric, SmapeLoss, create_tb_cb
 class rnn_model:
     """RNN model."""
 
-    output_len: int
+    dataset: training_dataset
     seq2seq: bool = False
     Nneurons: int = 20
     Nlayers: int = 1
     max_delay: int = 50
     model: tf.keras.layers.Layer = field(init=False)
     epochs: int = 100
+    batch_size: int = 32
 
     def __post_init__(self):
         """Build & compile the model."""
+        output_len = self.dataset.get_forecast_horizon()
         I_std = Input(1, name="std")
         I_mean = Input(1, name="mean")
         I_traffic = Input(shape=(self.max_delay, 6,), name="time datas")
@@ -32,15 +34,15 @@ class rnn_model:
         for ii in range(self.Nlayers-1):
             x = tf.keras.layers.GRU(self.Nneurons, return_sequences=True)(x)
         x = tf.keras.layers.GRU(self.Nneurons, return_sequences=self.seq2seq,
-                                dropout=.5, name="gru0")(x)
+                                name="gru0")(x)
 
         x = BatchNormalization()(x)
 
         if not self.seq2seq:
-            x = tf.keras.layers.Dense(self.output_len, name="dense0")(x)
+            x = tf.keras.layers.Dense(output_len, name="dense0")(x)
         else:
             x = keras.layers.TimeDistributed(
-                keras.layers.Dense(self.output_len), name="td")(x)
+                keras.layers.Dense(output_len), name="td")(x)
 
         x = tf.math.expm1(x * I_std + I_mean)
 
@@ -53,7 +55,7 @@ class rnn_model:
                            optimizer=tf.optimizers.Adam(learning_rate=1e-3),
                            metrics=[SmapeMetric()])
 
-    def fit(self, X_train: pd.DataFrame, Y_train: pd.DataFrame, val_data=None):
+    def fit(self):
         """Fit the model."""
         es_cb = tf.keras.callbacks.EarlyStopping(
             monitor='val_smape', min_delta=0.1, patience=10,
@@ -61,6 +63,7 @@ class rnn_model:
 
         tb_cb = create_tb_cb("rnn")
 
+        (X_train, Y_train), val_data = self.dataset.get_training_datasets()
         vd = val_data
         if val_data is not None:
             X_val, Y_val = val_data
@@ -71,7 +74,7 @@ class rnn_model:
                        Y_train.values,
                        epochs=self.epochs,
                        callbacks=[tb_cb, es_cb],
-                       batch_size=32,
+                       batch_size=self.batch_size,
                        validation_data=vd)
 
     def _features_preparation(self, X_train: pd.DataFrame):

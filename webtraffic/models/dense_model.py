@@ -3,13 +3,13 @@ import numpy as np
 import tensorflow as tf
 from dataclasses import dataclass, field
 from webtraffic.webtraffic_utils import SmapeLoss, SmapeMetric, create_tb_cb
-
+from webtraffic.inout import training_dataset
 
 @dataclass
 class dense_model:
     """Dense regression multioutput model with smape loss."""
 
-    output_len: int
+    dataset: training_dataset
     Ldelay: int = 100
     model: tf.keras.layers.Layer = field(init=False)
     epochs: int = 100
@@ -20,7 +20,7 @@ class dense_model:
         I_mean = tf.keras.layers.Input(1, name="mean")
         I_traffic = tf.keras.layers.Input(shape=(self.Ldelay,), name="traffic")
 
-        x = tf.keras.layers.Dense(units=self.output_len,
+        x = tf.keras.layers.Dense(units=self.dataset.get_forecast_horizon(),
                                   input_dim=self.Ldelay)(I_traffic)
 
         x = tf.math.expm1(x * I_std + I_mean)
@@ -33,7 +33,7 @@ class dense_model:
                            optimizer=tf.optimizers.Adam(learning_rate=1e-4),
                            metrics=[SmapeMetric()])
 
-    def fit(self, X_train: np.array, Y_train: np.array, val_data=None):
+    def fit(self):
         """Fit the model."""
         es_cb = tf.keras.callbacks.EarlyStopping(monitor='val_smape',
                                                  min_delta=0.1,
@@ -42,6 +42,7 @@ class dense_model:
                                                  restore_best_weights=True)
         tb_cb = create_tb_cb("dense")
 
+        (X_train, Y_train), val_data = self.dataset.get_training_datasets()
         vd = val_data
         if val_data is not None:
             X_val, Y_val = val_data

@@ -1,20 +1,25 @@
 """Simple model that repeats the median of the n last values."""
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from webtraffic.inout import training_dataset
 
 
 @dataclass
 class median_model:
     """Simple model that repeats the median of the n last values."""
 
+    dataset: training_dataset
     median_depth: int = 40
-    output_len: int = -1
+    output_len: int = field(init=False)
     epochs: int = -1
 
-    def fit(self, X_train: np.array, Y_train: np.array, val_data=None):
+    def __post_init__(self):
+        """post init method."""
+        self.output_len = self.dataset.get_forecast_horizon()
+
+    def fit(self):
         """Fit the model."""
-        self.output_len = Y_train.shape[1]
         return self
 
     def predict(self, X_train: pd.DataFrame):
