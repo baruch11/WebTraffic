@@ -41,8 +41,7 @@ X_train, X_test, Y_train, Y_test = get_training_datasets(traffic)
 
 for modname in MODELS:
     if modname.__name__ == args.model:
-        model = modname(input_shape=X_train.shape[1],
-                        output_len=Y_train.shape[1],
+        model = modname(output_len=Y_train.shape[1],
                         epochs=args.epochs)
 
 print("Fitting the model")

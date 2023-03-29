@@ -13,7 +13,6 @@ from webtraffic.webtraffic_utils import SmapeMetric, SmapeLoss, create_tb_cb
 class rnn_model:
     """RNN model."""
 
-    input_shape: int
     output_len: int
     seq2seq: bool = False
     Nneurons: int = 20

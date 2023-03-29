@@ -9,7 +9,6 @@ class median_model:
     """Simple model that repeats the median of the n last values."""
 
     median_depth: int = 40
-    input_shape: int = -1
     output_len: int = -1
     epochs: int = -1
 

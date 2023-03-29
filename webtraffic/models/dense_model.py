@@ -9,7 +9,6 @@ from webtraffic.webtraffic_utils import SmapeLoss, SmapeMetric, create_tb_cb
 class dense_model:
     """Dense regression multioutput model with smape loss."""
 
-    input_shape: int
     output_len: int
     Ldelay: int = 100
     model: tf.keras.layers.Layer = field(init=False)
