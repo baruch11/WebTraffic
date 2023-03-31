@@ -27,7 +27,7 @@ class rnn_model:
         output_len = self.dataset.get_forecast_horizon()
         I_std = Input(1, name="std")
         I_mean = Input(1, name="mean")
-        I_traffic = Input(shape=(self.max_delay, 6,), name="time datas")
+        I_traffic = Input(shape=(self.max_delay, 6,), name="time_datas")
 
         x = I_traffic
 
@@ -64,18 +64,28 @@ class rnn_model:
         tb_cb = create_tb_cb("rnn")
 
         (X_train, Y_train), val_data = self.dataset.get_training_datasets()
+
         vd = val_data
         if val_data is not None:
-            X_val, Y_val = val_data
-            vd = (self._features_preparation(X_val),
-                  Y_val.values)
+            vd = self._dataprep_tf_dataset(val_data[0], val_data[1])
 
-        self.model.fit(self._features_preparation(X_train),
-                       Y_train.values,
+        ds = self._dataprep_tf_dataset(X_train, Y_train)
+
+        self.model.fit(ds.shuffle(10000).batch(self.batch_size),
                        epochs=self.epochs,
                        callbacks=[tb_cb, es_cb],
-                       batch_size=self.batch_size,
-                       validation_data=vd)
+                       validation_data=vd.batch(1024))
+
+    def _dataprep_tf_dataset(self, X_train, Y_train):
+        """Compute data preparation and return a tf.Dataset."""
+        time_datas, x_mean, x_std = self._features_preparation(X_train)
+        ds_x = tf.data.Dataset.from_tensor_slices(
+            {"time_datas": time_datas, "mean": x_mean, "std": x_std})
+        ds_y = tf.data.Dataset.from_tensor_slices(Y_train.values)
+
+        ds = tf.data.Dataset.zip((ds_x, ds_y))
+        return ds
+
 
     def _features_preparation(self, X_train: pd.DataFrame):
         """Compute feature engineering."""
@@ -92,7 +102,7 @@ class rnn_model:
 
         weekday = pd.to_datetime(X_train.columns).weekday.\
             values[-self.max_delay:]
-        weekday = (weekday - 3.5) / 3.5
+        weekday = (weekday - 3.) / 3.
         weekday = np.repeat(weekday.reshape(1, -1),
                             X_train.shape[0], axis=0)
 
@@ -102,7 +112,7 @@ class rnn_model:
         access = np.repeat(access[:, np.newaxis, :], self.max_delay, axis=1)
         time_datas = np.concatenate((time_datas, access[:, :, :-1]), axis=-1)
 
-        return [time_datas, x_mean, x_std]
+        return time_datas, x_mean, x_std
 
     def _access_onehot_encode(self, X_train):
         """Return access one hot encode from X_train indexes."""
