@@ -51,6 +51,7 @@ class training_dataset:
 
     def __post_init__(self):
         """Complete init."""
+        self.traffic = self.traffic.sample(frac=1)
         self.train_first_day = pd.Timestamp(self.traffic.columns[0])
         self.train_last_day = pd.Timestamp(self.traffic.columns[-1])
 
