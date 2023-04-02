@@ -47,7 +47,7 @@ class training_dataset:
     pred_last_day: pd.Timestamp = pd.Timestamp(PRED_LAST_DAY)
     train_first_day: pd.Timestamp = field(init=False)
     train_last_day: pd.Timestamp = field(init=False)
-    validation_set: int = True
+    validation_set: bool = True
 
     def __post_init__(self):
         """Complete init."""
@@ -55,7 +55,7 @@ class training_dataset:
         self.train_first_day = pd.Timestamp(self.traffic.columns[0])
         self.train_last_day = pd.Timestamp(self.traffic.columns[-1])
 
-    def get_training_datasets(self):
+    def get_training_datasets(self, add_samples: int = 0):
         """Return tuples of DataFrames used to train/test the model.
 
         split the dataset to maximize number of samples used
@@ -64,8 +64,14 @@ class training_dataset:
         if validation_set is False then the training set is built
         with the last values of self.traffic
 
-        Returns:
-        --------
+        Parameters
+        ----------
+        add_samples (int)
+            number of additional samples to put in the targets (Y_). Sometimes
+            needed to train se2qseq models.
+
+        Returns
+        -------
         train_tuple (pd.DataFrame)
             (X_train, Y_train)
         test_tuple (pd.DataFrame)
@@ -73,9 +79,9 @@ class training_dataset:
         """
         horizon = self.get_forecast_horizon()
         lead = self._get_lead_time()
-        Y_test = self.traffic.iloc[:, -horizon:]
+        Y_test = self.traffic.iloc[:, -horizon-add_samples:]
         x_last = -horizon-lead+1
-        Y_train = self.traffic.iloc[:, x_last-horizon:x_last]
+        Y_train = self.traffic.iloc[:, x_last-horizon-add_samples:x_last]
         X_train = self.traffic.iloc[:, :x_last-horizon-lead+1]
         X_test = self.traffic.iloc[:, x_last-X_train.shape[1]:x_last]
 
