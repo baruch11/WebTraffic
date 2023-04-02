@@ -6,7 +6,8 @@ import pandas as pd
 from tensorflow import keras
 from tensorflow.keras.layers import Input, BatchNormalization
 from webtraffic.inout import training_dataset
-from webtraffic.webtraffic_utils import (SmapeLoss, create_tb_cb, smape)
+from webtraffic.webtraffic_utils import (SmapeLoss, create_tb_cb, smape,
+                                         rename)
 
 
 @dataclass
@@ -57,6 +58,7 @@ class rnn_model:
         self.model = tf.keras.Model(inputs=[I_traffic, I_mean, I_std],
                                     outputs=[outputs])
 
+        @rename("smape")
         def smape_metric(y_pred, y_true):
             if self.seq2seq:
                 return smape(y_pred[:, -1], y_true[:, -1])

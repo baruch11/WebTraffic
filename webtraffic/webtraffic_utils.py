@@ -92,6 +92,14 @@ def smape(A, F):
     return tf.reduce_mean(2 * tf.math.abs(F - A) / denom) * 100
 
 
+def rename(newname):
+    """Rename function."""
+    def decorator(f):
+        f.__name__ = newname
+        return f
+    return decorator
+
+
 def smape_reg(ypred, ytrue):
     """Compute regularized smape."""
     A = tf.cast(ypred, tf.float32)
