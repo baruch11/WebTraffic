@@ -81,7 +81,7 @@ class rnn_model:
         self.model.fit(ds_train.shuffle(10000).batch(self.batch_size),
                        epochs=self.epochs,
                        callbacks=[tb_cb, es_cb],
-                       validation_data=ds_test.batch(1024))
+                       validation_data=ds_test)
 
     def predict(self, X_train: pd.DataFrame):
         """Predict forecast from X_train.
@@ -109,6 +109,7 @@ class rnn_model:
         ds_test = val_data
         if val_data is not None:
             ds_test = self._dataprep_tf_dataset(val_data[0], val_data[1])
+            ds_test = ds_test.batch(1024)
 
         ds_train = self._dataprep_tf_dataset(X_train, Y_train)
         return ds_train, ds_test
