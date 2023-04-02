@@ -78,7 +78,7 @@ class training_dataset:
             (X_test, Y_test) or None
         """
         horizon = self.get_forecast_horizon()
-        lead = self._get_lead_time()
+        lead = self.get_lead_time()
         Y_test = self.traffic.iloc[:, -horizon-add_samples:]
         x_last = -horizon-lead+1
         Y_train = self.traffic.iloc[:, x_last-horizon-add_samples:x_last]
@@ -93,7 +93,7 @@ class training_dataset:
 
         return train_tuple, test_tuple
 
-    def _get_lead_time(self):
+    def get_lead_time(self):
         """Return prediction lead time."""
         return (self.pred_first_day - self.train_last_day).days
 

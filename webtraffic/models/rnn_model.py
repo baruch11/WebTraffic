@@ -28,7 +28,7 @@ class rnn_model:
         output_len = self.dataset.get_forecast_horizon()
         I_std = Input(1, name="std")
         I_mean = Input(1, name="mean")
-        I_traffic = Input(shape=(self.max_delay, 6,), name="time_datas")
+        I_traffic = Input(shape=(self.max_delay, 7,), name="time_datas")
 
         x = I_traffic
 
@@ -127,7 +127,7 @@ class rnn_model:
 
     def _features_preparation(self, X_train: pd.DataFrame):
         """Compute feature engineering."""
-        np_train = np.log1p(X_train.values[:, -self.max_delay:])
+        np_train = np.log1p(X_train.values)
 
         median = np.median(np_train, axis=1).reshape(-1, 1)
         median = median - np.mean(median)
@@ -137,6 +137,12 @@ class rnn_model:
         x_mean = np.mean(np_train, axis=1).reshape(-1, 1)
         x_std = (np.std(np_train, axis=1) + 1e-10).reshape(-1, 1)
         scaled_x = (np_train - x_mean) / x_std
+        current_x = scaled_x[:, -self.max_delay:]
+
+        horizon = self.dataset.get_forecast_horizon()
+        lead = self.dataset.get_lead_time()
+        lag1year = lead+horizon-365
+        past_year = scaled_x[:, lag1year-self.max_delay:lag1year]
 
         weekday = pd.to_datetime(X_train.columns).weekday.\
             values[-self.max_delay:]
@@ -144,7 +150,7 @@ class rnn_model:
         weekday = np.repeat(weekday.reshape(1, -1),
                             X_train.shape[0], axis=0)
 
-        time_datas = np.stack([scaled_x, weekday, median], axis=-1)
+        time_datas = np.stack([current_x, weekday, median, past_year], axis=-1)
 
         access = self._access_onehot_encode(X_train)
         access = np.repeat(access[:, np.newaxis, :], self.max_delay, axis=1)
