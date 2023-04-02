@@ -2,7 +2,7 @@
 import numpy as np
 import tensorflow as tf
 from dataclasses import dataclass, field
-from webtraffic.webtraffic_utils import SmapeLoss, SmapeMetric, create_tb_cb
+from webtraffic.webtraffic_utils import SmapeLoss, smape, create_tb_cb
 from webtraffic.inout import training_dataset
 
 @dataclass
@@ -31,7 +31,7 @@ class dense_model:
 
         self.model.compile(loss=SmapeLoss(),
                            optimizer=tf.optimizers.Adam(learning_rate=1e-4),
-                           metrics=[SmapeMetric()])
+                           metrics=[smape])
 
     def fit(self):
         """Fit the model."""

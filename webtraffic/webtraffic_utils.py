@@ -101,20 +101,6 @@ def smape_reg(ypred, ytrue):
     return tf.reduce_mean(2 * tf.abs(A - F) / summ) * 100
 
 
-class SmapeMetric(tf.keras.losses.Loss):
-    """Implement smape for loss of tf metrics."""
-
-    def __init__(self, name="smape", **kwargs):
-        super().__init__(name=name, **kwargs)
-
-    def call(self, y_true, y_pred):
-        return smape(y_pred, y_true)
-
-    def get_config(self):
-        base_config = super().get_config()
-        return {**base_config}
-
-
 class SmapeLoss(tf.keras.losses.Loss):
     """Implement smape for loss of tf models."""
     
