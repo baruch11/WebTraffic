@@ -17,8 +17,9 @@ class rnn_model:
 
     dataset: training_dataset
     seq2seq: bool = True
-    Nneurons: int = 20
+    Nneurons: int = 30
     Nlayers: int = 1
+    learning_rate: float = 5e-4
     max_delay: int = 50
     model: tf.keras.layers.Layer = field(init=False)
     epochs: int = 100
@@ -67,9 +68,10 @@ class rnn_model:
                 return smape(y_pred[:, -1], y_true[:, -1])
             return smape(y_pred, y_true)
 
-        self.model.compile(loss=SmapeLoss(),
-                           optimizer=tf.optimizers.Adam(learning_rate=1e-3),
-                           metrics=[smape_metric])
+        self.model.compile(
+            loss=SmapeLoss(),
+            optimizer=tf.optimizers.Adam(learning_rate=self.learning_rate),
+            metrics=[smape_metric])
 
     def fit(self):
         """Fit the model."""
@@ -98,7 +100,7 @@ class rnn_model:
                                      batch_size=1024)
         if self.seq2seq:
             rnn_out = rnn_out[:, -1]
-        ret = np.clip(rnn_out, a_min=0, a_max=None).astype(np.int32)
+        ret = np.clip(rnn_out, a_min=0, a_max=None).round().astype(np.int32)
         return ret
 
     def _get_train_test_ds(self):
