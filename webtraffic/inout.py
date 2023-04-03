@@ -3,12 +3,12 @@ import os
 import pandas as pd
 import numpy as np
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-TRAIN_FIRST_DAY = '2015-07-01'
-TRAIN_LAST_DAY = '2017-09-10'
-PRED_FIRST_DAY = '2017-09-13'
-PRED_LAST_DAY = '2017-11-13'
+# these constants are taken from the kaggle page
+TRAIN_LAST_DAY = pd.Timestamp('2017-09-10')
+PRED_FIRST_DAY = pd.Timestamp('2017-09-13')
+PRED_LAST_DAY = pd.Timestamp('2017-11-13')
 
 
 def get_root_dir() -> str:
@@ -43,17 +43,7 @@ class training_dataset:
     """Represents a training dataset with eventualy a validation dataset."""
 
     traffic: pd.DataFrame
-    pred_first_day: pd.Timestamp = pd.Timestamp(PRED_FIRST_DAY)
-    pred_last_day: pd.Timestamp = pd.Timestamp(PRED_LAST_DAY)
-    train_first_day: pd.Timestamp = field(init=False)
-    train_last_day: pd.Timestamp = field(init=False)
     validation_set: bool = True
-
-    def __post_init__(self):
-        """Complete init."""
-        self.traffic = self.traffic.sample(frac=1)
-        self.train_first_day = pd.Timestamp(self.traffic.columns[0])
-        self.train_last_day = pd.Timestamp(self.traffic.columns[-1])
 
     def get_training_datasets(self, add_samples: int = 0):
         """Return tuples of DataFrames used to train/test the model.
@@ -95,11 +85,11 @@ class training_dataset:
 
     def get_lead_time(self):
         """Return prediction lead time."""
-        return (self.pred_first_day - self.train_last_day).days
+        return (PRED_FIRST_DAY - TRAIN_LAST_DAY).days
 
     def get_forecast_horizon(self):
         """Return forecast horizon (how many days to predict)."""
-        return (self.pred_last_day - self.pred_first_day).days + 1
+        return (PRED_LAST_DAY - PRED_FIRST_DAY).days + 1
 
 
 @dataclass
