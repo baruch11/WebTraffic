@@ -79,7 +79,7 @@ class rnn_model:
             monitor='val_smape', min_delta=0.1, patience=10,
             verbose=0, restore_best_weights=True)
 
-        tb_cb = create_tb_cb("rnn")
+        tb_cb = create_tb_cb(self._name_tb())
 
         ds_train, ds_test = self._get_train_test_ds()
 
@@ -102,6 +102,10 @@ class rnn_model:
             rnn_out = rnn_out[:, -1]
         ret = np.clip(rnn_out, a_min=0, a_max=None).round().astype(np.int32)
         return ret
+
+    def _name_tb(self):
+        name = f"rnn-{self.Nneurons}-{self.Nlayers}-{self.learning_rate:.0E}"
+        return name
 
     def _get_train_test_ds(self):
         """Return train and test td.Datasets ."""
