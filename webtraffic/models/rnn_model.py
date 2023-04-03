@@ -8,6 +8,7 @@ from tensorflow.keras.layers import Input, BatchNormalization
 from webtraffic.inout import training_dataset
 from webtraffic.webtraffic_utils import (SmapeLoss, create_tb_cb, smape,
                                          rename)
+from sklearn.preprocessing import OneHotEncoder
 
 
 @dataclass
@@ -28,7 +29,9 @@ class rnn_model:
         output_len = self.dataset.get_forecast_horizon()
         I_std = Input(1, name="std")
         I_mean = Input(1, name="mean")
-        I_traffic = Input(shape=(self.max_delay, 7,), name="time_datas")
+        hits, hits_1y, med, week, access, country = 1, 1, 1, 1, 4, 9
+        feat_num = hits + hits_1y + med + week + access + country
+        I_traffic = Input(shape=(self.max_delay, feat_num,), name="time_datas")
 
         x = I_traffic
 
@@ -127,7 +130,23 @@ class rnn_model:
         return ds
 
     def _features_preparation(self, X_train: pd.DataFrame):
-        """Compute feature engineering."""
+        """Compute features.
+
+        Parameters
+        ----------
+        X_train (pd.DataFrame)
+            hits, index: wiki page name, columns: dates
+
+        Returns
+        -------
+        times_datas (np.array)
+            1st dim: samples, 2nd dim: time steps, 3rd: features (
+            current hits, 1year lag hits, access, country, day of the week)
+        x_mean (np.array)
+            vector of the mean of the log1p of the hits
+        x_std (np.array)
+            vector of the standard variance of the log1p of the hits
+        """
         np_train = np.log1p(X_train.values)
 
         median = np.median(np_train, axis=1).reshape(-1, 1)
@@ -148,14 +167,17 @@ class rnn_model:
         weekday = pd.to_datetime(X_train.columns).weekday.\
             values[-self.max_delay:]
         weekday = (weekday - 3.) / 3.
-        weekday = np.repeat(weekday.reshape(1, -1),
-                            X_train.shape[0], axis=0)
+        weekday = np.repeat(weekday.reshape(1, -1), X_train.shape[0], axis=0)
 
         time_datas = np.stack([current_x, weekday, median, past_year], axis=-1)
 
         access = self._access_onehot_encode(X_train)
         access = np.repeat(access[:, np.newaxis, :], self.max_delay, axis=1)
-        time_datas = np.concatenate((time_datas, access[:, :, :-1]), axis=-1)
+        time_datas = np.concatenate((time_datas, access[:, :, :]), axis=-1)
+
+        country = self._country_encoder(X_train)
+        country = np.repeat(country[:, np.newaxis, :], self.max_delay, axis=1)
+        time_datas = np.concatenate((time_datas, country[:, :, :]), axis=-1)
 
         return time_datas, x_mean, x_std
 
@@ -172,6 +194,20 @@ class rnn_model:
             if agent == "spider":
                 encoding = 3
             ret[line, encoding] = 1
+        return ret
+
+    def _country_encoder(self, X_train):
+        """Return country of the wikipedia page."""
+        country = np.array([
+            idx.split("_")[-3].split(".")[0]
+            for idx in X_train.index]).reshape(-1, 1)
+
+        categories = ['en', 'ja', 'de', 'fr', 'zh', 'ru', 'es', 'commons',
+                      'www']
+        encoder = OneHotEncoder(categories=[categories],
+                                handle_unknown='error',
+                                sparse_output=False)
+        ret = encoder.fit_transform(country)
         return ret
 
     def _to_seq2seq(self, target_in: np.array):
