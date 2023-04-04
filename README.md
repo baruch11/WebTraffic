@@ -6,7 +6,10 @@ Competition link : https://www.kaggle.com/competitions/web-traffic-time-series-f
 
 ## My solution
 
-My solution consists in a Gru RNN with 50-time steps with 20 neurons. Here are the main ideas :
+![webtraf_scheme](./images/webtraf_scheme.png)
+
+
+My solution consists in a Gru RNN with 50-time steps. Here are the main ideas :
 - Custom loss function (smape).
 - log1p and normalization on traffic hits. The mean and standard variance are injected after the final dense layer to recover the dynamics of the original data before calculating the loss. 
 - in addition to the hits, I injected the following features:
@@ -23,6 +26,10 @@ My solution consists in a Gru RNN with 50-time steps with 20 neurons. Here are t
 	- the model is retrained using the last 62 traffic hits as the target, and previsous steps for the training.
 	- as there is no validation set to make early stoping, we use the optimal epoch number found in the previous fine tuning step to end the gradient descent. 
 
+
+	
+## Score
+
 ## Replicate the results (on Mac M1)
 
 ```
@@ -31,9 +38,10 @@ conda activate webtraffic
 pip install -e .
 ```
 
-Then, after downloading and unzipping the data in the directory 'data' at the root of the project, you can run the training.
+Then, after downloading and unzipping the data in the directory 'data' at the root of the project, you can run the training with the script `webtraffic/train.py`.
 
-```
-python webtraffic/train.py
-```
-Check the options with 
+Check the options with `python webtraffic/train.py --help`
+
+I build the prediction for submission in 2 steps like said above:
+- tuning step : `python webtraffic/train.py -v` to fine tune the parameters and check the score on the validation set
+- submission : "blind training" (i.e. without validation set) on the last samples with `python webtraffic/train.py` 
